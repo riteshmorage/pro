@@ -73,82 +73,24 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="preview-card">
-                                    <h5><i class="fas fa-crosshairs"></i> Analysis Result</h5>
+                                    <h5><i class="fas fa-brain"></i> Detected Abnormality</h5>
                                     <div class="result-placeholder" id="resultPlaceholder">
                                         <i class="fas fa-spinner fa-spin"></i>
                                         <p>Analyzing brain scan...</p>
                                     </div>
                                     <img id="resultImage" class="preview-image" alt="Analysis result" style="display: none;">
+                                    <div class="detection-info" id="detectionInfo" style="display: none;"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Analysis Results -->
-                <div class="results-panel" id="resultsPanel" style="display: none;">
-                    <div class="panel-header">
-                        <h3><i class="fas fa-chart-bar"></i> Analysis Results</h3>
-                    </div>
-                    
-                    <div class="result-cards">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="result-card primary-result">
-                                    <div class="result-icon">
-                                        <i class="fas fa-brain"></i>
-                                    </div>
-                                    <div class="result-content">
-                                        <h4>Detection Status</h4>
-                                        <p class="result-value" id="detectionStatus">Analyzing...</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="result-card confidence-result">
-                                    <div class="result-icon">
-                                        <i class="fas fa-percentage"></i>
-                                    </div>
-                                    <div class="result-content">
-                                        <h4>Confidence Score</h4>
-                                        <div class="confidence-display">
-                                            <div class="confidence-circle" id="confidenceCircle">
-                                                <span class="confidence-text" id="confidenceText">0%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="result-card timestamp-result">
-                                    <div class="result-icon">
-                                        <i class="fas fa-clock"></i>
-                                    </div>
-                                    <div class="result-content">
-                                        <h4>Analysis Time</h4>
-                                        <p class="result-value" id="analysisTime">-</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Detailed Results -->
-                    <div class="detailed-results mt-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-list-alt"></i> Detailed Analysis Report</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="detailedReport">
-                                    <div class="text-center">
-                                        <i class="fas fa-spinner fa-spin fa-2x"></i>
-                                        <p class="mt-3">Generating detailed report...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Download Report Button -->
+                <div class="text-center mt-4" id="downloadSection" style="display: none;">
+                    <button class="btn btn-primary btn-lg" id="downloadReportBtn">
+                        <i class="fas fa-download"></i> Download Full Report (PDF)
+                    </button>
                 </div>
             </div>
 
@@ -244,6 +186,7 @@
     // Dashboard functionality
     class MedicalDashboard {
         constructor() {
+            this.currentFilename = null;
             this.initializeUpload();
             this.bindEvents();
         }
@@ -272,7 +215,11 @@
         }
 
         bindEvents() {
-            // Add any additional event bindings here
+            // Download report button
+            const downloadBtn = document.getElementById('downloadReportBtn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => this.downloadReport());
+            }
         }
 
         preventDefaults(e) {
@@ -343,6 +290,7 @@
                 const analysisTime = ((endTime - startTime) / 1000).toFixed(1);
                 
                 if (data.success) {
+                    this.currentFilename = data.results.filename;
                     this.showResults(data.results, analysisTime);
                 } else {
                     this.showAlert(data.error || 'Upload failed', 'error');
@@ -399,120 +347,50 @@
         }
 
         showResults(results, analysisTime) {
-            // Show results panel
-            document.getElementById('resultsPanel').style.display = 'block';
-            
-            // Update detection status
-            document.getElementById('detectionStatus').textContent = results.detected_abnormality;
-            
-            // Update confidence score with animation
-            this.animateConfidence(results.confidence_score * 100);
-            
-            // Update analysis time
-            document.getElementById('analysisTime').textContent = analysisTime + 's';
-            
             // Show result image if available
             if (results.has_result_image && results.result_image_url) {
                 const resultImage = document.getElementById('resultImage');
                 resultImage.src = results.result_image_url;
                 resultImage.style.display = 'block';
                 document.getElementById('resultPlaceholder').style.display = 'none';
-            }
-            
-            // Generate detailed report
-            this.generateDetailedReport(results);
-            
-            // Scroll to results
-            document.getElementById('resultsPanel').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        animateConfidence(confidence) {
-            const circle = document.getElementById('confidenceCircle');
-            const text = document.getElementById('confidenceText');
-            
-            let current = 0;
-            const increment = confidence / 50;
-            
-            const animation = setInterval(() => {
-                current += increment;
-                if (current >= confidence) {
-                    current = confidence;
-                    clearInterval(animation);
-                }
                 
-                text.textContent = Math.round(current) + '%';
-                
-                // Color coding
-                if (current >= 90) {
-                    circle.className = 'confidence-circle high';
-                } else if (current >= 70) {
-                    circle.className = 'confidence-circle medium';
+                // Show detection info
+                const detectionInfo = document.getElementById('detectionInfo');
+                if (results.detected_abnormality) {
+                    detectionInfo.innerHTML = `
+                        <small class="text-success mt-2">
+                            <i class="fas fa-check-circle"></i> <strong>Detected:</strong> ${results.detected_abnormality}<br>
+                            <i class="fas fa-clock"></i> Analysis Time: ${analysisTime}s
+                        </small>
+                    `;
+                    detectionInfo.style.display = 'block';
+                    
+                    // Show download button
+                    document.getElementById('downloadSection').style.display = 'block';
                 } else {
-                    circle.className = 'confidence-circle low';
+                    detectionInfo.innerHTML = `
+                        <small class="text-muted mt-2">
+                            <i class="fas fa-info-circle"></i> No abnormalities detected<br>
+                            <i class="fas fa-clock"></i> Analysis Time: ${analysisTime}s
+                        </small>
+                    `;
+                    detectionInfo.style.display = 'block';
                 }
-            }, 20);
+            } else {
+                // No result image, just show placeholder with message
+                const resultPlaceholder = document.getElementById('resultPlaceholder');
+                resultPlaceholder.innerHTML = `
+                    <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                    <p>Analysis Complete</p>
+                    <small class="text-muted">No abnormalities detected</small>
+                `;
+            }
         }
 
-        generateDetailedReport(results) {
-            const reportContainer = document.getElementById('detailedReport');
-            
-            const abnormalityInfo = {
-                'Normal Scan': {
-                    description: 'No abnormalities detected in the fetal brain scan.',
-                    severity: 'None',
-                    recommendations: 'Continue routine monitoring as per medical guidelines.'
-                },
-                'mild ventriculomegaly': {
-                    description: 'Mild enlargement of brain ventricles detected.',
-                    severity: 'Mild',
-                    recommendations: 'Regular monitoring and follow-up scans recommended.'
-                }
-                // Add more abnormality info as needed
-            };
-            
-            const info = abnormalityInfo[results.detected_abnormality] || {
-                description: 'AI analysis completed.',
-                severity: 'To be determined',
-                recommendations: 'Consult with medical professional for interpretation.'
-            };
-            
-            reportContainer.innerHTML = `
-                <div class="report-section">
-                    <h6><i class="fas fa-eye"></i> Detected Condition</h6>
-                    <p><strong>${results.detected_abnormality}</strong></p>
-                </div>
-                
-                <div class="report-section">
-                    <h6><i class="fas fa-info-circle"></i> Description</h6>
-                    <p>${info.description}</p>
-                </div>
-                
-                <div class="report-section">
-                    <h6><i class="fas fa-exclamation-triangle"></i> Severity Level</h6>
-                    <p><span class="severity-badge">${info.severity}</span></p>
-                </div>
-                
-                <div class="report-section">
-                    <h6><i class="fas fa-clipboard-list"></i> Recommendations</h6>
-                    <p>${info.recommendations}</p>
-                </div>
-                
-                <div class="report-section">
-                    <h6><i class="fas fa-chart-bar"></i> Technical Details</h6>
-                    <ul class="technical-details">
-                        <li>Model: YOLOv5 Fetal Brain Detection</li>
-                        <li>Confidence Score: ${(results.confidence_score * 100).toFixed(1)}%</li>
-                        <li>Image: ${results.original_filename}</li>
-                        <li>Analysis Date: ${new Date().toLocaleString()}</li>
-                    </ul>
-                </div>
-                
-                <div class="alert alert-warning mt-3">
-                    <strong><i class="fas fa-exclamation-triangle"></i> Medical Disclaimer:</strong>
-                    This AI analysis is for research and educational purposes only. 
-                    Always consult qualified medical professionals for clinical decisions.
-                </div>
-            `;
+        downloadReport() {
+            if (this.currentFilename) {
+                window.location.href = `/download_report/${this.currentFilename}`;
+            }
         }
 
         showAlert(message, type) {
